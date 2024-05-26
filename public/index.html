@@ -62,7 +62,7 @@
 
     // Fetch captions for a specified range
     function fetchCaptions(start, end) {
-        return fetch(`https://your-api-url.vercel.app/captions?start=${start}&end=${end}`)
+        return fetch(`https://captions-api-eight.vercel.app/captions?start=${start}&end=${end}`)
             .then(response => response.json())
             .then(data => data)
             .catch(error => console.error('Error fetching captions:', error));
@@ -78,7 +78,7 @@
 
         videoSource.src = videoUrl;
         video.load();
-        fetch('https://your-api-url.vercel.app/process-video-url', {
+        fetch('https://captions-api-eight.vercel.app/process-video-url', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
