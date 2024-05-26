@@ -4,7 +4,6 @@ const speech = require('@google-cloud/speech');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
-const ffmpeg = require('ffmpeg-static');
 require('dotenv').config();
 
 const app = express();
@@ -49,7 +48,7 @@ app.post('/process-video-url', async (req, res) => {
         const segmentPrefix = path.join(tempDir, 'segment');
         const segmentFormat = 'wav'; // Define segment file format
 
-        const ffmpegCommand = `${ffmpeg} -i "${videoUrl}" -f segment -segment_time 10 -ac 1 -ar 16000 -vn ${segmentPrefix}_%03d.${segmentFormat}`;
+        const ffmpegCommand = `ffmpeg -i "${videoUrl}" -f segment -segment_time 10 -ac 1 -ar 16000 -vn ${segmentPrefix}_%03d.${segmentFormat}`;
         console.log('Running ffmpeg command:', ffmpegCommand);
 
         exec(ffmpegCommand, (error, stdout, stderr) => {
