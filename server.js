@@ -36,6 +36,7 @@ app.get('/captions', (req, res) => {
 // Endpoint to process video URL
 app.post('/process-video-url', async (req, res) => {
     const videoUrl = req.body.videoUrl;
+    console.log('Received video URL:', videoUrl);
     if (!videoUrl) {
         return res.status(400).send('No video URL provided.');
     }
@@ -44,27 +45,29 @@ app.post('/process-video-url', async (req, res) => {
     fs.mkdirSync(tempDir, { recursive: true }); // Ensure the directory exists
 
     try {
-        // Stream the video using ffmpeg
         const segmentPrefix = path.join(tempDir, 'segment');
         const segmentFormat = 'wav'; // Define segment file format
 
         const ffmpegCommand = `ffmpeg -i "${videoUrl}" -f segment -segment_time 10 -ac 1 -ar 16000 -vn ${segmentPrefix}_%03d.${segmentFormat}`;
+        console.log('Running ffmpeg command:', ffmpegCommand);
 
-        exec(ffmpegCommand, (error) => {
+        exec(ffmpegCommand, (error, stdout, stderr) => {
             if (error) {
-                console.error('Error splitting audio:', error);
+                console.error('Error splitting audio:', error.message);
+                console.error('ffmpeg stderr:', stderr);
                 return res.status(500).send('Failed to split audio');
             }
 
-            // Read the directory of segments
+            console.log('ffmpeg stdout:', stdout);
+
             fs.readdir(tempDir, (err, files) => {
                 if (err) {
                     console.error('Error reading audio segments:', err);
                     return res.status(500).send('Failed to read audio segments');
                 }
 
-                // Filter out non-wav files and process each segment
                 const segmentFiles = files.filter(file => file.endsWith(`.${segmentFormat}`));
+                console.log('Segment files:', segmentFiles);
                 let transcriptions = [];
                 captions = []; // Reset captions
 
@@ -112,7 +115,7 @@ app.post('/process-video-url', async (req, res) => {
                             }
                         })
                         .catch(err => {
-                            console.error('ERROR:', err);
+                            console.error('ERROR transcribing audio:', err.message);
                             res.status(500).send('Failed to transcribe audio');
                         });
                 });
@@ -120,12 +123,12 @@ app.post('/process-video-url', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error processing video URL:', error);
+        console.error('Error processing video URL:', error.message);
         res.status(500).send('Failed to process video URL');
     }
 });
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
 });
