@@ -64,8 +64,17 @@
     function fetchCaptions(start, end) {
         return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}`)
             .then(response => response.json())
-            .then(data => data)
-            .catch(error => console.error('Error fetching captions:', error));
+            .then(data => {
+                if (!Array.isArray(data)) {
+                    console.error('Invalid captions data:', data);
+                    return [];
+                }
+                return data;
+            })
+            .catch(error => {
+                console.error('Error fetching captions:', error);
+                return [];
+            });
     }
 
     // Process video URL
