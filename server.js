@@ -105,6 +105,7 @@ app.post('/process-video-url', async (req, res) => {
 
                             // Check if all files have been processed
                             if (transcriptions.length === segmentFiles.length) {
+                                console.log('All segments processed');
                                 res.send('Transcription complete and captions saved.');
                             }
                         })
