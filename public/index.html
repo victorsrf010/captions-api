@@ -50,7 +50,6 @@
 </video>
 <div id="captions"></div>
 
-
 <script>
     const video = document.getElementById('meuVideo');
     const videoSource = document.getElementById('videoSource');
@@ -63,7 +62,7 @@
 
     // Fetch captions for a specified range
     function fetchCaptions(start, end) {
-        return fetch(`https://captions-api-eight.vercel.app/captions?start=${start}&end=${end}`)
+        return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}`)
             .then(response => response.json())
             .then(data => data)
             .catch(error => console.error('Error fetching captions:', error));
@@ -72,6 +71,7 @@
     // Process video URL
     processButton.addEventListener('click', () => {
         const videoUrl = videoUrlInput.value;
+        console.log('Processing video URL:', videoUrl);
         if (!videoUrl) {
             alert('Please enter a video URL.');
             return;
@@ -79,7 +79,7 @@
 
         videoSource.src = videoUrl;
         video.load();
-        fetch('https://captions-api-eight.vercel.app/process-video-url', {
+        fetch('https://captions-api-production.up.railway.app/process-video-url', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -87,8 +87,7 @@
             body: JSON.stringify({ videoUrl })
         }).then(response => response.text())
             .then(data => {
-                console.log(data);
-                // Load initial captions after processing is complete
+                console.log('Processing response:', data);
                 fetchCaptions(0, 5).then(data => {
                     captions = data;
                     loadedUntil = 5;
