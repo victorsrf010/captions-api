@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Captions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        video {
+            width: 80%;
+            max-width: 800px;
+            border: 2px solid #333;
+            border-radius: 10px;
+        }
+        #captions {
+            position: absolute;
+            bottom: 20px;
+            width: 80%;
+            max-width: 800px;
+            text-align: center;
+            font-size: 18px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            display: none;
+        }
+        #form-container {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<div id="form-container">
+    <input type="text" id="videoUrlInput" placeholder="Enter video URL">
+    <button id="processButton">Process Video</button>
+</div>
+<video id="meuVideo" controls>
+    <source id="videoSource" type="video/mp4">
+    Your browser does not support the video tag.
+</video>
+<div id="captions"></div>
+
+<script>
+    const video = document.getElementById('meuVideo');
+    const videoSource = document.getElementById('videoSource');
+    const captionsDiv = document.getElementById('captions');
+    const videoUrlInput = document.getElementById('videoUrlInput');
+    const processButton = document.getElementById('processButton');
+    let captions = [];
+    let loadedUntil = 0;
+    let lastCaption = '';
+
+    // Fetch captions for a specified range
+    function fetchCaptions(start, end) {
+        return fetch(`https://your-api-url.vercel.app/captions?start=${start}&end=${end}`)
+            .then(response => response.json())
+            .then(data => data)
+            .catch(error => console.error('Error fetching captions:', error));
+    }
+
+    // Process video URL
+    processButton.addEventListener('click', () => {
+        const videoUrl = videoUrlInput.value;
+        if (!videoUrl) {
+            alert('Please enter a video URL.');
+            return;
+        }
+
+        videoSource.src = videoUrl;
+        video.load();
+        fetch('https://your-api-url.vercel.app/process-video-url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ videoUrl })
+        }).then(response => response.text())
+            .then(data => {
+                console.log(data);
+                // Load initial captions after processing is complete
+                fetchCaptions(0, 5).then(data => {
+                    captions = data;
+                    loadedUntil = 5;
+                    console.log('Initial captions loaded:', captions);
+                });
+            })
+            .catch(error => console.error('Error processing video URL:', error));
+    });
+
+    // Update captions when the video is playing
+    video.addEventListener('timeupdate', () => {
+        const currentTime = video.currentTime;
+        console.log('Current video time:', currentTime);
+        updateCaptions(currentTime);
+
+        if (currentTime >= loadedUntil - 1) {
+            fetchCaptions(loadedUntil, loadedUntil + 5).then(data => {
+                captions = captions.concat(data);
+                loadedUntil += 5;
+                console.log('More captions loaded:', captions);
+            });
+        }
+    });
+
+    // Handle seeking in the video
+    video.addEventListener('seeked', () => {
+        const currentTime = video.currentTime;
+        console.log('Seeked to:', currentTime);
+        const start = Math.floor(currentTime / 5) * 5;
+        const end = start + 5;
+        fetchCaptions(start, end).then(data => {
+            captions = data;
+            loadedUntil = end;
+            console.log('Captions loaded after seek:', captions);
+            updateCaptions(currentTime);
+        });
+    });
+
+    function updateCaptions(currentTime) {
+        // Find the caption that should be displayed at the current time
+        const currentCaption = captions.find(caption => currentTime >= caption.time && currentTime < caption.time + 5);
+        if (currentCaption) {
+            captionsDiv.innerText = currentCaption.text;
+            captionsDiv.style.display = 'block';
+            lastCaption = currentCaption.text;
+        } else if (lastCaption) {
+            captionsDiv.innerText = lastCaption;
+            captionsDiv.style.display = 'block';
+        } else {
+            captionsDiv.style.display = 'none';
+        }
+    }
+</script>
+</body>
+</html>
