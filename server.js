@@ -3,10 +3,12 @@ const { exec } = require('child_process');
 const speech = require('@google-cloud/speech');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
 app.use(express.json());
+app.use(cors()); // Enable CORS
 
 let captions = []; // Array to store captions
 
