@@ -3,7 +3,7 @@ const { exec } = require('child_process');
 const speech = require('@google-cloud/speech');
 const fs = require('fs');
 const path = require('path');
-const cors = require('cors');
+const cors = require('cors'); // Import CORS
 require('dotenv').config();
 
 const app = express();
@@ -36,7 +36,6 @@ app.get('/captions', (req, res) => {
 // Endpoint to process video URL
 app.post('/process-video-url', async (req, res) => {
     const videoUrl = req.body.videoUrl;
-    console.log('Received video URL:', videoUrl);
     if (!videoUrl) {
         return res.status(400).send('No video URL provided.');
     }
@@ -45,29 +44,27 @@ app.post('/process-video-url', async (req, res) => {
     fs.mkdirSync(tempDir, { recursive: true }); // Ensure the directory exists
 
     try {
+        // Stream the video using ffmpeg
         const segmentPrefix = path.join(tempDir, 'segment');
         const segmentFormat = 'wav'; // Define segment file format
 
         const ffmpegCommand = `ffmpeg -i "${videoUrl}" -f segment -segment_time 10 -ac 1 -ar 16000 -vn ${segmentPrefix}_%03d.${segmentFormat}`;
-        console.log('Running ffmpeg command:', ffmpegCommand);
 
-        exec(ffmpegCommand, (error, stdout, stderr) => {
+        exec(ffmpegCommand, (error) => {
             if (error) {
-                console.error('Error splitting audio:', error.message);
-                console.error('ffmpeg stderr:', stderr);
+                console.error('Error splitting audio:', error);
                 return res.status(500).send('Failed to split audio');
             }
 
-            console.log('ffmpeg stdout:', stdout);
-
+            // Read the directory of segments
             fs.readdir(tempDir, (err, files) => {
                 if (err) {
                     console.error('Error reading audio segments:', err);
                     return res.status(500).send('Failed to read audio segments');
                 }
 
+                // Filter out non-wav files and process each segment
                 const segmentFiles = files.filter(file => file.endsWith(`.${segmentFormat}`));
-                console.log('Segment files:', segmentFiles);
                 let transcriptions = [];
                 captions = []; // Reset captions
 
@@ -110,12 +107,11 @@ app.post('/process-video-url', async (req, res) => {
 
                             // Check if all files have been processed
                             if (transcriptions.length === segmentFiles.length) {
-                                console.log('All segments processed');
                                 res.send('Transcription complete and captions saved.');
                             }
                         })
                         .catch(err => {
-                            console.error('ERROR transcribing audio:', err.message);
+                            console.error('ERROR:', err);
                             res.status(500).send('Failed to transcribe audio');
                         });
                 });
@@ -123,7 +119,7 @@ app.post('/process-video-url', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error processing video URL:', error.message);
+        console.error('Error processing video URL:', error);
         res.status(500).send('Failed to process video URL');
     }
 });

@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Captions</title>
+    <title>Video Callback</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
+            position: relative;
         }
         video {
             width: 80%;
@@ -34,19 +34,12 @@
             border-radius: 10px;
             display: none;
         }
-        #form-container {
-            margin-bottom: 20px;
-        }
     </style>
 </head>
 <body>
-<div id="form-container">
-    <input type="text" id="videoUrlInput" placeholder="Enter video URL">
-    <button id="processButton">Process Video</button>
-</div>
 <video id="meuVideo" controls>
     <source id="videoSource" type="video/mp4">
-    Your browser does not support the video tag.
+    Seu navegador não suporta a tag de vídeo.
 </video>
 <div id="captions"></div>
 
@@ -54,38 +47,21 @@
     const video = document.getElementById('meuVideo');
     const videoSource = document.getElementById('videoSource');
     const captionsDiv = document.getElementById('captions');
-    const videoUrlInput = document.getElementById('videoUrlInput');
-    const processButton = document.getElementById('processButton');
     let captions = [];
     let loadedUntil = 0;
     let lastCaption = '';
 
-    // Fetch captions for a specified range
-    function fetchCaptions(start, end) {
-        return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}`)
-            .then(response => response.json())
-            .then(data => {
-                if (!Array.isArray(data)) {
-                    console.error('Invalid captions data:', data);
-                    return [];
-                }
-                return data;
-            })
-            .catch(error => {
-                console.error('Error fetching captions:', error);
-                return [];
-            });
+    // Function to get query parameter by name
+    function getQueryParam(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
     }
 
-    // Process video URL
-    processButton.addEventListener('click', () => {
-        const videoUrl = videoUrlInput.value;
-        console.log('Processing video URL:', videoUrl);
-        if (!videoUrl) {
-            alert('Please enter a video URL.');
-            return;
-        }
+    // Get the video URL from the query parameter
+    const videoUrl = getQueryParam('videoUrl');
 
+    if (videoUrl) {
+        // Process video URL on page load
         videoSource.src = videoUrl;
         video.load();
         fetch('https://captions-api-production.up.railway.app/process-video-url', {
@@ -96,7 +72,8 @@
             body: JSON.stringify({ videoUrl })
         }).then(response => response.text())
             .then(data => {
-                console.log('Processing response:', data);
+                console.log(data);
+                // Load initial captions after processing is complete
                 fetchCaptions(0, 5).then(data => {
                     captions = data;
                     loadedUntil = 5;
@@ -104,12 +81,22 @@
                 });
             })
             .catch(error => console.error('Error processing video URL:', error));
-    });
+    } else {
+        alert('No video URL provided.');
+    }
+
+    // Fetch captions for a specified range
+    function fetchCaptions(start, end) {
+        return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}`)
+            .then(response => response.json())
+            .then(data => data)
+            .catch(error => console.error('Error fetching captions:', error));
+    }
 
     // Update captions when the video is playing
     video.addEventListener('timeupdate', () => {
         const currentTime = video.currentTime;
-        console.log('Current video time:', currentTime);
+        console.log('Tempo atual do vídeo:', currentTime);
         updateCaptions(currentTime);
 
         if (currentTime >= loadedUntil - 1) {
