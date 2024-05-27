@@ -20,6 +20,7 @@
             max-width: 800px;
             border: 2px solid #333;
             border-radius: 10px;
+            filter: brightness(50%);
         }
         #captions {
             position: absolute;
@@ -42,15 +43,38 @@
             font-size: 24px;
             font-weight: bold;
             color: #333;
+            background: white;
+            border-radius: 15px;
+            padding: 10px;
+        }
+        .video-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 80%;
+            max-width: 800px;
+        }
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
         }
     </style>
 </head>
 <body>
-<div id="loader">Loading...</div>
-<video id="meuVideo" controls disabled>
-    <source id="videoSource" type="video/mp4">
-    Seu navegador não suporta a tag de vídeo.
-</video>
+<div id="loader">Loading captions...</div>
+<div class="video-container">
+    <video id="meuVideo" controls disabled>
+        <source id="videoSource" type="video/mp4">
+        Seu navegador não suporta a tag de vídeo.
+    </video>
+    <div class="video-overlay"></div>
+</div>
 <div id="captions"></div>
 
 <script>
@@ -58,6 +82,7 @@
     const videoSource = document.getElementById('videoSource');
     const captionsDiv = document.getElementById('captions');
     const loader = document.getElementById('loader');
+    const videoOverlay = document.querySelector('.video-overlay');
     let captions = [];
     let loadedUntil = 0;
     let lastCaption = '';
@@ -91,6 +116,7 @@
                     loadedUntil = 5;
                     console.log('Initial captions loaded:', captions); // Debug: log captions
                     loader.style.display = 'none';
+                    videoOverlay.style.display = 'none';
                     video.removeAttribute('disabled');
                 });
             })
