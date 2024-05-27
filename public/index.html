@@ -108,6 +108,7 @@
     if (videoUrl) {
         console.log('Video URL:', videoUrl); // Debug: log video URL
         // Process video URL on page load
+        captions = []; // Reset captions array at the start
         videoSource.src = videoUrl;
         video.load();
         processVideoUrl(videoUrl, selectedLanguage);
@@ -118,6 +119,7 @@
     // Event listener for language selection
     languageSelect.addEventListener('change', () => {
         selectedLanguage = languageSelect.value;
+        captions = []; // Reset captions array on language change
         processVideoUrl(videoUrl, selectedLanguage);
     });
 
@@ -132,7 +134,7 @@
             .then(data => {
                 console.log('Processing response:', data); // Debug: log response data
                 // Load initial captions after processing is complete
-                fetchCaptions(0, 5, language).then(data => {
+                fetchCaptions(0, 5, language, videoUrl).then(data => {
                     captions = data;
                     loadedUntil = 5;
                     console.log('Initial captions loaded:', captions); // Debug: log captions
@@ -148,8 +150,8 @@
     }
 
     // Fetch captions for a specified range
-    function fetchCaptions(start, end, language) {
-        return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}&language=${language}`)
+    function fetchCaptions(start, end, language, videoUrl) {
+        return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}&language=${language}&videoUrl=${videoUrl}`)
             .then(response => response.json())
             .then(data => data)
             .catch(error => console.error('Error fetching captions:', error));
@@ -162,7 +164,7 @@
         updateCaptions(currentTime);
 
         if (currentTime >= loadedUntil - 1) {
-            fetchCaptions(loadedUntil, loadedUntil + 5, selectedLanguage).then(data => {
+            fetchCaptions(loadedUntil, loadedUntil + 5, selectedLanguage, videoUrl).then(data => {
                 captions = captions.concat(data);
                 loadedUntil += 5;
                 console.log('More captions loaded:', captions); // Debug: log more captions
@@ -176,7 +178,7 @@
         console.log('Seeked to:', currentTime); // Debug: log seeked time
         const start = Math.floor(currentTime / 5) * 5;
         const end = start + 5;
-        fetchCaptions(start, end, selectedLanguage).then(data => {
+        fetchCaptions(start, end, selectedLanguage, videoUrl).then(data => {
             captions = data;
             loadedUntil = end;
             console.log('Captions loaded after seek:', captions); // Debug: log captions after seek

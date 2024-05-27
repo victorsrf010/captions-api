@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(cors()); // Enable CORS
 
-let captions = []; // Array to store captions
+let captionsStore = {}; // Object to store captions per video
 
 // Parse credentials from environment variable
 let credentials;
@@ -33,12 +33,14 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Endpoint to retrieve captions with pagination
+// Endpoint to retrieve captions with pagination and language support
 app.get('/captions', (req, res) => {
     const start = parseFloat(req.query.start) || 0;
     const end = parseFloat(req.query.end) || 5;
     const language = req.query.language || 'en-US'; // Default to English
-    const requestedCaptions = captions.filter(caption => caption.time >= start && caption.time < end && caption.language === language);
+    const videoUrl = req.query.videoUrl; // Get video URL from query
+    const videoCaptions = captionsStore[videoUrl] || [];
+    const requestedCaptions = videoCaptions.filter(caption => caption.time >= start && caption.time < end && caption.language === language);
     res.json(requestedCaptions);
 });
 
@@ -79,7 +81,7 @@ app.post('/process-video-url', async (req, res) => {
                 const segmentFiles = files.filter(file => file.endsWith(`.${segmentFormat}`));
                 console.log('Segment files:', segmentFiles);
                 let transcriptions = [];
-                captions = []; // Reset captions
+                captionsStore[videoUrl] = []; // Reset captions for the specific video
 
                 let processedFiles = 0; // Track the number of processed files
 
@@ -113,7 +115,7 @@ app.post('/process-video-url', async (req, res) => {
                             console.log(`Transcription for ${file}:`, transcription);
 
                             // Push transcription with timestamp (now using 10 seconds per segment)
-                            captions.push({
+                            captionsStore[videoUrl].push({
                                 time: index * 10, // Adjust this to match the new segment time
                                 text: transcription,
                                 language: language
