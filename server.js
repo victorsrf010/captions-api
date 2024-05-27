@@ -72,6 +72,8 @@ app.post('/process-video-url', async (req, res) => {
                 let transcriptions = [];
                 captions = []; // Reset captions
 
+                let processedFiles = 0; // Track the number of processed files
+
                 segmentFiles.forEach((file, index) => {
                     const filePath = path.join(tempDir, file);
                     const fileContent = fs.readFileSync(filePath);
@@ -109,16 +111,18 @@ app.post('/process-video-url', async (req, res) => {
 
                             transcriptions.push(transcription);
 
+                            processedFiles++;
                             // Check if all files have been processed
-                            if (transcriptions.length === segmentFiles.length) {
+                            if (processedFiles === segmentFiles.length) {
                                 console.log('All segments processed');
                                 res.send('Transcription complete and captions saved.');
                             }
                         })
                         .catch(err => {
                             console.error('ERROR transcribing audio:', err.message);
-                            console.error('Error details:', err);
-                            res.status(500).send('Failed to transcribe audio');
+                            if (processedFiles === segmentFiles.length) {
+                                res.status(500).send('Failed to transcribe audio');
+                            }
                         });
                 });
             });
