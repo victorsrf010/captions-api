@@ -13,7 +13,12 @@ app.use(cors()); // Enable CORS
 let captions = []; // Array to store captions
 
 // Parse credentials from environment variable
-const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+let credentials;
+try {
+    credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+} catch (error) {
+    console.error("Error parsing GOOGLE_APPLICATION_CREDENTIALS_JSON:", error);
+}
 
 // Google Cloud Speech-to-Text client setup
 const client = new speech.SpeechClient({
