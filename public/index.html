@@ -13,10 +13,9 @@
             height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
-            position: relative;
         }
         video {
-            width: 80%;
+            width: 100%;
             max-width: 800px;
             border: 2px solid #333;
             border-radius: 10px;
@@ -24,7 +23,7 @@
         #captions {
             position: absolute;
             bottom: 20px;
-            width: 80%;
+            width: 100%;
             max-width: 800px;
             text-align: center;
             font-size: 18px;
@@ -45,13 +44,11 @@
             background: white;
             border-radius: 15px;
             padding: 10px;
+            z-index: 2;
         }
         .video-container {
             position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 80%;
+            width: 100%;
             max-width: 800px;
         }
         .video-overlay {
@@ -62,12 +59,13 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
             border-radius: 10px;
+            z-index: 1;
         }
     </style>
 </head>
 <body>
-<div id="loader">Loading captions...</div>
 <div class="video-container">
+    <div id="loader">Loading captions...</div>
     <video id="meuVideo" controls disabled>
         <source id="videoSource" type="video/mp4">
         Seu navegador não suporta a tag de vídeo.
