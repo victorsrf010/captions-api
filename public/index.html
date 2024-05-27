@@ -61,6 +61,12 @@
             border-radius: 10px;
             z-index: 1;
         }
+        #language-select {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
@@ -73,6 +79,10 @@
     <div class="video-overlay"></div>
 </div>
 <div id="captions"></div>
+<select id="language-select">
+    <option value="en-US">English</option>
+    <option value="de-DE">German</option>
+</select>
 
 <script>
     const video = document.getElementById('meuVideo');
@@ -80,6 +90,7 @@
     const captionsDiv = document.getElementById('captions');
     const loader = document.getElementById('loader');
     const videoOverlay = document.querySelector('.video-overlay');
+    const languageSelect = document.getElementById('language-select');
     let captions = [];
     let loadedUntil = 0;
     let lastCaption = '';
@@ -92,23 +103,36 @@
 
     // Get the video URL from the query parameter
     const videoUrl = getQueryParam('videoUrl');
+    let selectedLanguage = languageSelect.value;
 
     if (videoUrl) {
         console.log('Video URL:', videoUrl); // Debug: log video URL
         // Process video URL on page load
         videoSource.src = videoUrl;
         video.load();
+        processVideoUrl(videoUrl, selectedLanguage);
+    } else {
+        alert('No video URL provided.');
+    }
+
+    // Event listener for language selection
+    languageSelect.addEventListener('change', () => {
+        selectedLanguage = languageSelect.value;
+        processVideoUrl(videoUrl, selectedLanguage);
+    });
+
+    function processVideoUrl(videoUrl, language) {
         fetch('https://captions-api-production.up.railway.app/process-video-url', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ videoUrl })
+            body: JSON.stringify({ videoUrl, language })
         }).then(response => response.text())
             .then(data => {
                 console.log('Processing response:', data); // Debug: log response data
                 // Load initial captions after processing is complete
-                fetchCaptions(0, 5).then(data => {
+                fetchCaptions(0, 5, language).then(data => {
                     captions = data;
                     loadedUntil = 5;
                     console.log('Initial captions loaded:', captions); // Debug: log captions
@@ -121,13 +145,11 @@
                 console.error('Error processing video URL:', error);
                 loader.innerText = 'Failed to load captions.';
             });
-    } else {
-        alert('No video URL provided.');
     }
 
     // Fetch captions for a specified range
-    function fetchCaptions(start, end) {
-        return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}`)
+    function fetchCaptions(start, end, language) {
+        return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}&language=${language}`)
             .then(response => response.json())
             .then(data => data)
             .catch(error => console.error('Error fetching captions:', error));
@@ -140,7 +162,7 @@
         updateCaptions(currentTime);
 
         if (currentTime >= loadedUntil - 1) {
-            fetchCaptions(loadedUntil, loadedUntil + 5).then(data => {
+            fetchCaptions(loadedUntil, loadedUntil + 5, selectedLanguage).then(data => {
                 captions = captions.concat(data);
                 loadedUntil += 5;
                 console.log('More captions loaded:', captions); // Debug: log more captions
@@ -154,7 +176,7 @@
         console.log('Seeked to:', currentTime); // Debug: log seeked time
         const start = Math.floor(currentTime / 5) * 5;
         const end = start + 5;
-        fetchCaptions(start, end).then(data => {
+        fetchCaptions(start, end, selectedLanguage).then(data => {
             captions = data;
             loadedUntil = end;
             console.log('Captions loaded after seek:', captions); // Debug: log captions after seek

@@ -37,13 +37,14 @@ app.get('/', (req, res) => {
 app.get('/captions', (req, res) => {
     const start = parseFloat(req.query.start) || 0;
     const end = parseFloat(req.query.end) || 5;
-    const requestedCaptions = captions.filter(caption => caption.time >= start && caption.time < end);
+    const language = req.query.language || 'en-US'; // Default to English
+    const requestedCaptions = captions.filter(caption => caption.time >= start && caption.time < end && caption.language === language);
     res.json(requestedCaptions);
 });
 
-// Endpoint to process video URL
+// Endpoint to process video URL with language support
 app.post('/process-video-url', async (req, res) => {
-    const videoUrl = req.body.videoUrl;
+    const { videoUrl, language } = req.body;
     if (!videoUrl) {
         console.error('No video URL provided.');
         return res.status(400).send('No video URL provided.');
@@ -94,7 +95,7 @@ app.post('/process-video-url', async (req, res) => {
                     const config = {
                         encoding: 'LINEAR16',
                         sampleRateHertz: 16000,
-                        languageCode: 'en-US',
+                        languageCode: language, // Use the selected language
                     };
 
                     const request = {
@@ -114,7 +115,8 @@ app.post('/process-video-url', async (req, res) => {
                             // Push transcription with timestamp (now using 10 seconds per segment)
                             captions.push({
                                 time: index * 10, // Adjust this to match the new segment time
-                                text: transcription
+                                text: transcription,
+                                language: language
                             });
 
                             transcriptions.push(transcription);
