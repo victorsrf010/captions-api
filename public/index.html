@@ -34,10 +34,20 @@
             border-radius: 10px;
             display: none;
         }
+        #loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
     </style>
 </head>
 <body>
-<video id="meuVideo" controls>
+<div id="loader">Loading...</div>
+<video id="meuVideo" controls disabled>
     <source id="videoSource" type="video/mp4">
     Seu navegador não suporta a tag de vídeo.
 </video>
@@ -47,6 +57,7 @@
     const video = document.getElementById('meuVideo');
     const videoSource = document.getElementById('videoSource');
     const captionsDiv = document.getElementById('captions');
+    const loader = document.getElementById('loader');
     let captions = [];
     let loadedUntil = 0;
     let lastCaption = '';
@@ -79,9 +90,14 @@
                     captions = data;
                     loadedUntil = 5;
                     console.log('Initial captions loaded:', captions); // Debug: log captions
+                    loader.style.display = 'none';
+                    video.removeAttribute('disabled');
                 });
             })
-            .catch(error => console.error('Error processing video URL:', error));
+            .catch(error => {
+                console.error('Error processing video URL:', error);
+                loader.innerText = 'Failed to load captions.';
+            });
     } else {
         alert('No video URL provided.');
     }
@@ -121,6 +137,13 @@
             console.log('Captions loaded after seek:', captions); // Debug: log captions after seek
             updateCaptions(currentTime);
         });
+    });
+
+    // Reset captions on page unload
+    window.addEventListener('beforeunload', () => {
+        captions = [];
+        loadedUntil = 0;
+        lastCaption = '';
     });
 
     function updateCaptions(currentTime) {
