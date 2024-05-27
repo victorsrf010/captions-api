@@ -3,7 +3,7 @@ const { exec } = require('child_process');
 const speech = require('@google-cloud/speech');
 const fs = require('fs');
 const path = require('path');
-const cors = require('cors'); // Import CORS
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
@@ -117,6 +117,7 @@ app.post('/process-video-url', async (req, res) => {
                         })
                         .catch(err => {
                             console.error('ERROR transcribing audio:', err.message);
+                            console.error('Error details:', err);
                             res.status(500).send('Failed to transcribe audio');
                         });
                 });
