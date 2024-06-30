@@ -15,11 +15,17 @@ let captionsStore = {};
 
 let credentials;
 try {
-    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    const credentialsContent = fs.readFileSync(credentialsPath);
-    credentials = JSON.parse(credentialsContent);
+    const credentialsPathOrJson = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (credentialsPathOrJson.startsWith('{')) {
+        // If the environment variable is a JSON string, parse it
+        credentials = JSON.parse(credentialsPathOrJson);
+    } else {
+        // If the environment variable is a file path, read the file content
+        const credentialsContent = fs.readFileSync(credentialsPathOrJson);
+        credentials = JSON.parse(credentialsContent);
+    }
 } catch (error) {
-    console.error("Error reading or parsing Google Cloud credentials file:", error);
+    console.error("Error reading or parsing Google Cloud credentials:", error);
 }
 
 const speechClient = new speech.SpeechClient({ credentials });
