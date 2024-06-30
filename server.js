@@ -13,14 +13,13 @@ app.use(cors());
 
 let captionsStore = {};
 
+// Load Google Cloud credentials
 let credentials;
 try {
     const credentialsPathOrJson = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     if (credentialsPathOrJson.startsWith('{')) {
-        // If the environment variable is a JSON string, parse it
         credentials = JSON.parse(credentialsPathOrJson);
     } else {
-        // If the environment variable is a file path, read the file content
         const credentialsContent = fs.readFileSync(credentialsPathOrJson);
         credentials = JSON.parse(credentialsContent);
     }
@@ -28,20 +27,24 @@ try {
     console.error("Error reading or parsing Google Cloud credentials:", error);
 }
 
+// Initialize Google Cloud clients
 const speechClient = new speech.SpeechClient({ credentials });
 const translateClient = new Translate({ credentials });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve the HTML file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Endpoint to retrieve captions with pagination and language support
 app.get('/captions', (req, res) => {
     const { start, end, language, videoUrl } = req.query;
     const videoCaptions = captionsStore[videoUrl] || [];
     let requestedCaptions = videoCaptions.filter(caption => caption.time >= start && caption.time < end);
 
+    // Translate captions if a language other than English is requested
     if (language && language !== 'en-US') {
         requestedCaptions = requestedCaptions.map(caption => {
             const translation = caption.translations[language];
@@ -55,6 +58,7 @@ app.get('/captions', (req, res) => {
     res.json(requestedCaptions);
 });
 
+// Endpoint to process video URL and generate captions
 app.post('/process-video-url', async (req, res) => {
     const { videoUrl } = req.body;
 
@@ -68,6 +72,7 @@ app.post('/process-video-url', async (req, res) => {
     const segmentPrefix = path.join(tempDir, 'segment');
     const segmentFormat = 'wav';
 
+    // Split video into audio segments using ffmpeg
     const ffmpegCommand = `ffmpeg -i "${videoUrl}" -f segment -segment_time 10 -ac 1 -ar 16000 -vn ${segmentPrefix}_%03d.${segmentFormat}`;
     exec(ffmpegCommand, (error, stdout, stderr) => {
         if (error) {
@@ -99,6 +104,7 @@ app.post('/process-video-url', async (req, res) => {
 
                 const request = { audio, config };
 
+                // Transcribe audio segment using Google Cloud Speech-to-Text
                 speechClient.recognize(request)
                     .then(data => {
                         const response = data[0];
@@ -126,6 +132,7 @@ app.post('/process-video-url', async (req, res) => {
     });
 });
 
+// Endpoint to translate captions into the specified language
 app.post('/translate-caption', async (req, res) => {
     const { videoUrl, language } = req.body;
 
