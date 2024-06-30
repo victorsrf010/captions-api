@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -82,6 +82,10 @@
 <select id="language-select">
     <option value="en-US">English</option>
     <option value="de-DE">German</option>
+    <option value="pt-PT">Portuguese</option>
+    <option value="es-ES">Spanish</option>
+    <option value="fr-FR">French</option>
+    <option value="ro-RO">Romanian</option>
 </select>
 
 <script>
@@ -95,20 +99,17 @@
     let loadedUntil = 0;
     let lastCaption = '';
 
-    // Function to get query parameter by name
     function getQueryParam(name) {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get(name);
     }
 
-    // Get the video URL from the query parameter
     const videoUrl = getQueryParam('videoUrl');
     let selectedLanguage = languageSelect.value;
 
     if (videoUrl) {
-        console.log('Video URL:', videoUrl); // Debug: log video URL
-        // Process video URL on page load
-        captions = []; // Reset captions array at the start
+        console.log('Video URL:', videoUrl);
+        captions = [];
         videoSource.src = videoUrl;
         video.load();
         processVideoUrl(videoUrl, selectedLanguage);
@@ -116,15 +117,22 @@
         alert('No video URL provided.');
     }
 
-    // Event listener for language selection
     languageSelect.addEventListener('change', () => {
         selectedLanguage = languageSelect.value;
-        captions = []; // Reset captions array on language change
+        captions = [];
+        loader.style.display = 'block';
+        videoOverlay.style.display = 'block';
+        video.pause();
+        video.setAttribute('disabled', 'true');
         processVideoUrl(videoUrl, selectedLanguage);
     });
 
     function processVideoUrl(videoUrl, language) {
+        video.pause(); // Pause the video
+        video.setAttribute('disabled', 'true');
+
         fetch('https://captions-api-production.up.railway.app/process-video-url', {
+        // fetch('http://localhost:3001/process-video-url', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -132,16 +140,42 @@
             body: JSON.stringify({ videoUrl, language })
         }).then(response => response.text())
             .then(data => {
-                console.log('Processing response:', data); // Debug: log response data
-                // Load initial captions after processing is complete
-                fetchCaptions(0, 5, language, videoUrl).then(data => {
-                    captions = data;
-                    loadedUntil = 5;
-                    console.log('Initial captions loaded:', captions); // Debug: log captions
-                    loader.style.display = 'none';
-                    videoOverlay.style.display = 'none';
-                    video.removeAttribute('disabled');
-                });
+                console.log('Processing response:', data);
+
+                const fetchAndDisplayCaptions = () => {
+                    fetchCaptions(0, 5, language, videoUrl).then(data => {
+                        captions = data;
+                        loadedUntil = 5;
+                        console.log('Initial captions loaded:', captions);
+                        loader.style.display = 'none';
+                        videoOverlay.style.display = 'none';
+                        video.removeAttribute('disabled');
+                        video.play();
+                    });
+                };
+
+                if (language !== 'en-US') {
+                    fetch('https://captions-api-production.up.railway.app/translate-caption', {
+                    // fetch('http://localhost:3001/translate-caption', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ videoUrl, language })
+                    }).then(translateResponse => {
+                        if (translateResponse.ok) {
+                            fetchAndDisplayCaptions();
+                        } else {
+                            console.error('Failed to translate captions.');
+                            loader.innerText = 'Failed to load captions.';
+                        }
+                    }).catch(error => {
+                        console.error('Error translating captions:', error);
+                        loader.innerText = 'Failed to load captions.';
+                    });
+                } else {
+                    fetchAndDisplayCaptions();
+                }
             })
             .catch(error => {
                 console.error('Error processing video URL:', error);
@@ -149,44 +183,42 @@
             });
     }
 
-    // Fetch captions for a specified range
+
     function fetchCaptions(start, end, language, videoUrl) {
         return fetch(`https://captions-api-production.up.railway.app/captions?start=${start}&end=${end}&language=${language}&videoUrl=${videoUrl}`)
+        // return fetch(`http://localhost:3001/captions?start=${start}&end=${end}&language=${language}&videoUrl=${videoUrl}`)
             .then(response => response.json())
             .then(data => data)
             .catch(error => console.error('Error fetching captions:', error));
     }
 
-    // Update captions when the video is playing
     video.addEventListener('timeupdate', () => {
         const currentTime = video.currentTime;
-        console.log('Tempo atual do vídeo:', currentTime); // Debug: log current time
+        console.log('Tempo atual do vídeo:', currentTime);
         updateCaptions(currentTime);
 
         if (currentTime >= loadedUntil - 1) {
             fetchCaptions(loadedUntil, loadedUntil + 5, selectedLanguage, videoUrl).then(data => {
                 captions = captions.concat(data);
                 loadedUntil += 5;
-                console.log('More captions loaded:', captions); // Debug: log more captions
+                console.log('More captions loaded:', captions);
             });
         }
     });
 
-    // Handle seeking in the video
     video.addEventListener('seeked', () => {
         const currentTime = video.currentTime;
-        console.log('Seeked to:', currentTime); // Debug: log seeked time
+        console.log('Seeked to:', currentTime);
         const start = Math.floor(currentTime / 5) * 5;
         const end = start + 5;
         fetchCaptions(start, end, selectedLanguage, videoUrl).then(data => {
             captions = data;
             loadedUntil = end;
-            console.log('Captions loaded after seek:', captions); // Debug: log captions after seek
+            console.log('Captions loaded after seek:', captions);
             updateCaptions(currentTime);
         });
     });
 
-    // Reset captions on page unload
     window.addEventListener('beforeunload', () => {
         captions = [];
         loadedUntil = 0;
@@ -194,19 +226,16 @@
     });
 
     function updateCaptions(currentTime) {
-        // Find the caption that should be displayed at the current time
-        const currentCaption = captions.find(caption => currentTime >= caption.time && currentTime < caption.time + 5);
+        const currentCaption = captions.find(caption => currentTime >= caption.time && currentTime < caption.time + 10);
         if (currentCaption) {
             captionsDiv.innerText = currentCaption.text;
             captionsDiv.style.display = 'block';
             lastCaption = currentCaption.text;
-        } else if (lastCaption) {
-            captionsDiv.innerText = lastCaption;
-            captionsDiv.style.display = 'block';
         } else {
             captionsDiv.style.display = 'none';
         }
     }
+
 </script>
 </body>
 </html>

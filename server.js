@@ -1,6 +1,7 @@
 const express = require('express');
 const { exec } = require('child_process');
 const speech = require('@google-cloud/speech');
+const { Translate } = require('@google-cloud/translate').v2;
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
@@ -8,143 +9,143 @@ require('dotenv').config();
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // Enable CORS
+app.use(cors());
 
-let captionsStore = {}; // Object to store captions per video
+let captionsStore = {};
 
-// Parse credentials from environment variable
 let credentials;
 try {
-    credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    const credentialsContent = fs.readFileSync(credentialsPath);
+    credentials = JSON.parse(credentialsContent);
 } catch (error) {
-    console.error("Error parsing GOOGLE_APPLICATION_CREDENTIALS_JSON:", error);
+    console.error("Error reading or parsing Google Cloud credentials file:", error);
 }
 
-// Google Cloud Speech-to-Text client setup
-const client = new speech.SpeechClient({
-    credentials: credentials
-});
+const speechClient = new speech.SpeechClient({ credentials });
+const translateClient = new Translate({ credentials });
 
-// Serve static files from the "public" directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve the HTML file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Endpoint to retrieve captions with pagination and language support
 app.get('/captions', (req, res) => {
-    const start = parseFloat(req.query.start) || 0;
-    const end = parseFloat(req.query.end) || 5;
-    const language = req.query.language || 'en-US'; // Default to English
-    const videoUrl = req.query.videoUrl; // Get video URL from query
+    const { start, end, language, videoUrl } = req.query;
     const videoCaptions = captionsStore[videoUrl] || [];
-    const requestedCaptions = videoCaptions.filter(caption => caption.time >= start && caption.time < end && caption.language === language);
+    let requestedCaptions = videoCaptions.filter(caption => caption.time >= start && caption.time < end);
+
+    if (language && language !== 'en-US') {
+        requestedCaptions = requestedCaptions.map(caption => {
+            const translation = caption.translations[language];
+            return {
+                ...caption,
+                text: translation || caption.text
+            };
+        });
+    }
+
     res.json(requestedCaptions);
 });
 
-// Endpoint to process video URL with language support
 app.post('/process-video-url', async (req, res) => {
-    const { videoUrl, language } = req.body;
+    const { videoUrl } = req.body;
+
     if (!videoUrl) {
-        console.error('No video URL provided.');
         return res.status(400).send('No video URL provided.');
     }
 
-    const tempDir = `/tmp/audio_segments`; // Directory to store audio segments
-    fs.mkdirSync(tempDir, { recursive: true }); // Ensure the directory exists
+    const tempDir = `/tmp/audio_segments`;
+    fs.mkdirSync(tempDir, { recursive: true });
 
-    try {
-        // Stream the video using ffmpeg
-        const segmentPrefix = path.join(tempDir, 'segment');
-        const segmentFormat = 'wav'; // Define segment file format
+    const segmentPrefix = path.join(tempDir, 'segment');
+    const segmentFormat = 'wav';
 
-        const ffmpegCommand = `ffmpeg -i "${videoUrl}" -f segment -segment_time 10 -ac 1 -ar 16000 -vn ${segmentPrefix}_%03d.${segmentFormat}`;
-        console.log('Running ffmpeg command:', ffmpegCommand);
+    const ffmpegCommand = `ffmpeg -i "${videoUrl}" -f segment -segment_time 10 -ac 1 -ar 16000 -vn ${segmentPrefix}_%03d.${segmentFormat}`;
+    exec(ffmpegCommand, (error, stdout, stderr) => {
+        if (error) {
+            return res.status(500).send('Failed to split audio');
+        }
 
-        exec(ffmpegCommand, (error, stdout, stderr) => {
-            if (error) {
-                console.error('Error splitting audio:', error.message);
-                console.error('ffmpeg stderr:', stderr);
-                return res.status(500).send('Failed to split audio');
+        fs.readdir(tempDir, (err, files) => {
+            if (err) {
+                return res.status(500).send('Failed to read audio segments');
             }
 
-            console.log('ffmpeg stdout:', stdout);
+            const segmentFiles = files.filter(file => file.endsWith(`.${segmentFormat}`));
+            let transcriptions = [];
+            captionsStore[videoUrl] = [];
 
-            fs.readdir(tempDir, (err, files) => {
-                if (err) {
-                    console.error('Error reading audio segments:', err);
-                    return res.status(500).send('Failed to read audio segments');
-                }
+            let processedFiles = 0;
 
-                const segmentFiles = files.filter(file => file.endsWith(`.${segmentFormat}`));
-                console.log('Segment files:', segmentFiles);
-                let transcriptions = [];
-                captionsStore[videoUrl] = []; // Reset captions for the specific video
+            segmentFiles.forEach((file, index) => {
+                const filePath = path.join(tempDir, file);
+                const fileContent = fs.readFileSync(filePath);
+                const audioBytes = fileContent.toString('base64');
 
-                let processedFiles = 0; // Track the number of processed files
+                const audio = { content: audioBytes };
+                const config = {
+                    encoding: 'LINEAR16',
+                    sampleRateHertz: 16000,
+                    languageCode: 'en-US',
+                };
 
-                segmentFiles.forEach((file, index) => {
-                    const filePath = path.join(tempDir, file);
-                    const fileContent = fs.readFileSync(filePath);
-                    const audioBytes = fileContent.toString('base64');
+                const request = { audio, config };
 
-                    const audio = {
-                        content: audioBytes,
-                    };
+                speechClient.recognize(request)
+                    .then(data => {
+                        const response = data[0];
+                        const transcription = response.results.map(result => result.alternatives[0].transcript).join('\n');
 
-                    const config = {
-                        encoding: 'LINEAR16',
-                        sampleRateHertz: 16000,
-                        languageCode: language, // Use the selected language
-                    };
-
-                    const request = {
-                        audio: audio,
-                        config: config,
-                    };
-
-                    client.recognize(request)
-                        .then(data => {
-                            const response = data[0];
-                            const transcription = response.results
-                                .map(result => result.alternatives[0].transcript)
-                                .join('\n');
-
-                            console.log(`Transcription for ${file}:`, transcription);
-
-                            // Push transcription with timestamp (now using 10 seconds per segment)
-                            captionsStore[videoUrl].push({
-                                time: index * 10, // Adjust this to match the new segment time
-                                text: transcription,
-                                language: language
-                            });
-
-                            transcriptions.push(transcription);
-
-                            processedFiles++;
-                            // Check if all files have been processed
-                            if (processedFiles === segmentFiles.length) {
-                                console.log('All segments processed');
-                                res.send('Transcription complete and captions saved.');
-                            }
-                        })
-                        .catch(err => {
-                            console.error('ERROR transcribing audio:', err.message);
-                            if (processedFiles === segmentFiles.length) {
-                                res.status(500).send('Failed to transcribe audio');
-                            }
+                        captionsStore[videoUrl].push({
+                            time: index * 10,
+                            text: transcription,
+                            translations: {}
                         });
-                });
+
+                        transcriptions.push(transcription);
+                        processedFiles++;
+                        if (processedFiles === segmentFiles.length) {
+                            res.send('Transcription complete and captions saved.');
+                        }
+                    })
+                    .catch(err => {
+                        if (processedFiles === segmentFiles.length) {
+                            res.status(500).send('Failed to transcribe audio');
+                        }
+                    });
             });
         });
+    });
+});
 
+app.post('/translate-caption', async (req, res) => {
+    const { videoUrl, language } = req.body;
+
+    if (!videoUrl || !language) {
+        return res.status(400).send('Video URL and language are required.');
+    }
+
+    const videoCaptions = captionsStore[videoUrl];
+    if (!videoCaptions) {
+        return res.status(404).send('Captions not found for the specified video.');
+    }
+
+    try {
+        for (const caption of videoCaptions) {
+            if (!caption.translations[language]) {
+                const [translation] = await translateClient.translate(caption.text, language);
+                caption.translations[language] = translation;
+            }
+        }
+        res.send('Translation complete.');
     } catch (error) {
-        console.error('Error processing video URL:', error.message);
-        res.status(500).send('Failed to process video URL');
+        console.error('Translation error:', error);
+        res.status(500).send('Translation failed.');
     }
 });
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
